@@ -3,6 +3,7 @@ import colors from 'kleur';
 import fs from 'fs';
 import { relative } from 'path';
 import * as ports from 'port-authority';
+import * as vite from 'vite';
 import chokidar from 'chokidar';
 import { load_config } from './core/config/index.js';
 import { networkInterfaces, release } from 'os';
@@ -178,13 +179,30 @@ prog
 			await check_port(port);
 
 			process.env.NODE_ENV = process.env.NODE_ENV || 'production';
-			const config = await load_config();
 
-			const { preview } = await import('./core/preview/index.js');
+			const { sveltekit_plugin } = await import('./core/preview/index.js');
 
-			await preview({ port, host, config, https });
+			/** @type {import('vite').UserConfig} */
+			const config = {
+				plugins: [sveltekit_plugin]
+			};
+			config.preview = config.preview || {};
 
-			welcome({ port, host, https, open, base: config.kit.paths.base });
+			// optional config from command-line flags
+			// these should take precedence, but not print conflict warnings
+			if (host) {
+				config.preview.host = host;
+			}
+			if (https) {
+				config.preview.https = https;
+			}
+			if (port) {
+				config.preview.port = port;
+			}
+
+			const preview_server = await vite.preview(config);
+
+			welcome({ port, host, https, open, base: preview_server.config.base });
 		} catch (error) {
 			handle_error(error);
 		}
